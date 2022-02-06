@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" /><title>Mon 1er jeu Phaser</title>
+<script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+
+<script src="weapon.js"></script>
+
+<style type="text/css"> body { margin: 0; }</style>
+</head>
+<body>
+    <script type="text/javascript">
+        var config = {
+            type: Phaser.AUTO,
+            width: 900, height: 1000,
+            physics: {
+                default: 'arcade',
+                arcade: {
+                gravity: { y: 300 },
+                debug: false
+                }},
+                 
+            scene: {preload: preload, create: create, update: update }
+            };
+
+            new Phaser.Game(config);
+                        
+
+            function preload(){
+                this.load.image('sky', 'assets/sky.png');
+                this.load.image('ground', 'assets/platform.png');
+                this.load.image('star', 'assets/star.png');
+                this.load.image('bomb', 'assets/bomb.png');
+                this.load.image('bolt', 'assets/bolt.png');
+                this.load.image('plan1', 'assets/backgroundplan1.2.png');
+                this.load.image('plan2', 'assets/backgroundplan2.2.png');
+                this.load.image('plan3', 'assets/backgroundplan3.2.png');
+                this.load.image('plan4', 'assets/backgroundplan4.2.png');
+                this.load.image('PV4Barre', 'assets/lifebarre4.png');
+                this.load.image('PV3Barre', 'assets/lifebarre3.png');
+                this.load.image('PV2Barre', 'assets/lifebarre2.png');
+                this.load.image('PV1Barre', 'assets/lifebarre1.png');
+                this.load.image('PV0Barre', 'assets/lifebarre0.png');
+                this.load.image('item', 'assets/item32.png');
+                this.load.image("tiles","assets/sprite2dprogra.png")
+                this.load.tilemapTiledJSON('map',"assets/map1.json");
+                this.load.spritesheet('perso','assets/persosspritesheetmk2.png',
+                { frameWidth: 48, frameHeight: 64 });
+                this.load.spritesheet('snail','assets/Spritemonstrebigver64.png',
+                { frameWidth: 64, frameHeight: 64 });
+
+                
+                //this.load.spritesheet('monstre','assets/Spritemonstre.png' 
+                //{frameWidth: 32, frameHeight: 32})
+                
+                }
+
+            var platforms;
+            var player;
+            var cursors;
+            var stars;
+            var score;
+            var bolts;
+            var score = 0;
+            var bombs = false;
+            var gameOver = false;
+            var spacebar
+            var keyT
+            var snail
+            var lastFired = 0;
+            var direction = 'left'
+            var UICam
+            var invulnTime = 2100 //In ms
+
+            function checkDash( player, direction, velocity ) {
+                if( (Phaser.Input.Keyboard.JustDown( spacebar )) ) {
+                    //console.log("DASJH ON")
+                    player.setVelocityX(velocity); 
+                    player.dash = true;
+                    player.dashCounter = 0;
+                }
+            }
+            function boltHit(  snail, bolt ) {
+                snail.destroy()
+            }
+            function checkFire(player, time,gameobject) {
+                if (Phaser.Input.Keyboard.JustDown( keyA ) && time > lastFired)
+                {
+                    var bolt = bolts.get()
+                    UICam.ignore( bolt)
+                    if (bolt)                 {
+                        bolt.fire(player.x, player.y)
+                        lastFired = time + 50
+                    }
+                }    
+            }
+
+            function checkJump(player) {
+                if ( player.jumpCount == undefined) {
+                    player.jumpCount = 0;
+                }
+                
+                if (player.jumpCount <= 1 && Phaser.Input.Keyboard.JustDown( doubleJump ) ){
+                    player.setVelocityY(-330); //alors vitesse verticale négative
+                    player.jumpCount += 1;
+                } 
+
+                if ( player.jumpCount > 0 ) { //&& player.body.touching.down) {
+                    player.jumpCount = 0;
+                }
+            }
+            function update(time, delta) {
+
+
+                if (this.PV == 0) {
+                    this.dead()
+                }
+                if ( player.y >= (config.height-40) ) {
+                    this.scene.restart()
+                }
+                if (cursors.left.isDown){ //si la touche gauche est appuyée
+                    direction = 'left'
+                    if ( player.dash ){
+                        player.dashCounter++;
+                        if (player.dashCounter >= 20 ) {
+                            player.dash = false;
+                        }
+                    } else {
+                        player.setVelocityX(-160); //alors vitesse négative en X
+                        player.anims.play('left', true); //et animation => gauche
+                    }        
+                    checkDash( player, 'left', -600)
+                } else if (cursors.right.isDown) { //sinon si la touche droite est appuyée
+                    direction = 'right'
+                    if ( player.dash ){
+                        player.dashCounter++;
+                        if (player.dashCounter >= 20) {
+                            player.dash = false;
+                    }
+                    } else {
+                        player.setVelocityX(160); //alors vitesse positive en X
+                        player.anims.play('right', true); //et animation => droite
+                    }
+                    checkDash( player, 'right', 600)
+                } else { // sinon
+                    player.setVelocityX(0); //vitesse nulle
+                    if (direction == 'left') {
+                        player.anims.play('left'); //animation fait face caméra
+                    } else {
+                        player.anims.play('right'); //animation fait face caméra
+                    }
+                }
+
+            // Manage invuln.
+            if ( Date.now() - player.PV_timeout > invulnTime ) {
+                player.isinvulnerable = false
+                player.invulnTime = 2100
+                player.clearTint()
+            }
+            if (player.isinvulnerable) {
+                player.setTint(0x00F000)
+            }
+            checkJump(player)            
+            checkFire(player, time, this)
+            scoreText.setText('Score: ' + score); //met à jour l’affichage du score 
+        }
+    
+        function displaySnail(game) {
+            let snail = snails.get()
+            UICam.ignore( snail)
+            snail.setActive(true)
+            snail.setVisible(true)
+            snail.setPosition( Phaser.Math.Between(1920, 1920*2), 20);
+            snail.direction = 'right'
+            snail.anims.play('rightsnail')
+            //snail.setCollideWorldBounds(true)
+            //snail.setVelocity(Phaser.Math.Between(-200, 200), 20)
+            //snail.allowGravity = true; 
+            //snail.anims.play('rightsnail', true);
+        }
+
+    function create (){
+
+        backgroundplan4 = this.add.tileSprite(2880,540 ,0, 0, "plan4");
+        backgroundplan4.setScrollFactor(0.6);
+        backgroundplan3 = this.add.tileSprite(2880,540 ,0, 0, "plan3");
+        backgroundplan3.setScrollFactor(0.95);
+        backgroundplan2 = this.add.tileSprite(2880,540,0, 0, "plan2");
+        backgroundplan2.setScrollFactor(0.98);
+        backgroundplan1 = this.add.tileSprite(2880,540 ,0, 0, "plan1");
+        backgroundplan1.setScrollFactor(1);
+
+        var Snail = new Phaser.Class({
+
+            Extends: Phaser.GameObjects.Sprite,
+            initialize:
+                function Snail(scene)
+                {
+                    Phaser.GameObjects.Sprite.call(this, scene, 0, 0, 'snail');
+                    this.speed = Phaser.Math.GetSpeed(200, 1);
+                    this.direction = 'left'
+                    this.anims.play('leftsnail', true) 
+                },    
+            update: function (time, delta)
+                {
+                    if (this.x <= 1920) { 
+                        this.direction = 'right'
+                        this.anims.play('rightsnail', true) 
+                    }
+                    if (this.x >= 1920*2) { 
+                        this.direction = 'left'
+                        this.anims.play('leftsnail', true) 
+                    }
+                    if (this.direction == 'left') {
+                        this.x -= this.speed * delta
+                    } else {
+                        this.x += this.speed * delta
+                    }
+                    if ( this.y >= (config.height - 40) ) {
+                        this.setActive(false)
+                        this.setVisible(false)
+                        displaySnail()
+                    }
+                }    
+        });
+
+        var Bolt = new Phaser.Class({
+
+            Extends: Phaser.GameObjects.Image,
+            initialize:
+                function Bullet (scene)
+                {
+                    Phaser.GameObjects.Image.call(this, scene, 0, 0, 'bolt');
+                    this.speed = Phaser.Math.GetSpeed(400, 1);
+                },    
+            fire: function (x, y)
+                {
+                    this.direction = direction
+                    if (direction == 'left') {
+                        this.setPosition(x - 10, y +9);
+                    } else {
+                        this.setPosition(x + 10, y +9);
+                    }
+                    this.startPos = x
+                    this.setActive(true);
+                    this.setVisible(true);
+                },    
+            update: function (time, delta)
+                {
+
+                    if (this.direction == 'left') {
+                        this.x -= this.speed * delta
+                    } else {
+                        this.x += this.speed * delta
+                    }
+                    if ( Math.abs(this.x -  this.startPos) > (config.width/2) )
+                    {
+                        this.setActive(false)
+                        this.setVisible(false)
+                    }
+                }    
+        });
+        bolts = this.physics.add.group({
+            classType: Bolt,
+            maxSize: 20,
+            runChildUpdate: true,
+            allowGravity: false
+        });
+
+        this.anims.create({
+            key: 'leftsnail',
+            frames: this.anims.generateFrameNumbers('snail', { frames: [1, 0, 3, 2]}),
+            frameRate: 10,
+            repeat: -1
+            });
+
+        this.anims.create({
+            key: 'rightsnail',
+            frames: this.anims.generateFrameNumbers('snail', {start:4,end:7}),
+            frameRate: 10,
+            repeat: -1
+        });
+
+        platforms = this.physics.add.staticGroup();
+        platforms.create(400, 568, 'ground').setScale(2).refreshBody();
+        platforms.create(600, 400, 'ground');
+        platforms.create(50, 250, 'ground');
+        platforms.create(750, 220, 'ground');
+
+        player = this.physics.add.sprite(3000, 450, 'perso');
+        player.setBounce(0.2);
+        player.setCollideWorldBounds(true);
+        player.PV = 4;
+        player.PV_timeout = Date.now()
+
+        this.physics.world.setBounds(0, 0, 5940, 1080);
+        this.cameras.main.setBounds(0, 0, 5940, 1080);             
+        this.cameras.main.startFollow(player);
+
+        this.physics.add.collider(player, platforms);
+        this.anims.create({
+            key: 'left',
+            frames: this.anims.generateFrameNumbers('perso', { frames: [1, 0, 3, 2] } ),
+            frameRate: 10,
+            repeat: -1
+            });
+        this.anims.create({
+            key: 'turn',
+            frames: [ { key: 'perso', frame: 4 } ],
+            frameRate: 20
+        });
+        this.anims.create({
+            key: 'right',
+            frames: this.anims.generateFrameNumbers('perso', {start:4,end:7}),
+            frameRate: 10,
+            repeat: -1
+        });
+ 
+        cursors = this.input.keyboard.createCursorKeys();
+
+        /*UI Desgin */
+        scoreText = this.add.text(16,16,'score: 0',{fontSize:'32px',fill:'#000'});
+        scoreText.setColor('white')
+        scoreText.setScrollFactor(1)        
+        PVBarre = this.add.tileSprite(800,64,0,0, "PV4Barre")
+
+        //affiche un texte à l’écran, pour le score
+        stars = this.physics.add.group({
+            key: 'star', repeat: 1,////////////////////////////nombre etoile
+            setXY: { x: 12, y: 0, stepX: 70 }
+            });
+        stars.children.iterate(function (child) {
+            child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
+        }); //chaque étoile va rebondir un peu différemment
+        this.physics.add.collider(stars, platforms);
+        //et collisionne avec les plateformes
+        this.physics.add.overlap(player, stars, collectStar, null, this);
+        //le contact perso/étoile ne génère pas de collision (overlap)
+
+        this.cameras.main.ignore( [ scoreText, PVBarre ] )
+        UICam = this.cameras.add(0, 0, config.width, config.height)
+        UICam.ignore([ backgroundplan4, backgroundplan1, backgroundplan2, backgroundplan3, platforms, player])
+
+        
+        bonusItems = this.physics.add.group( { maxSize: 4, runChildUpdate: true, allowGravity: true } )
+        this.physics.add.collider(bonusItems, platforms);
+        this.physics.add.collider(player, bonusItems, hitBonus, null, this);
+        bonus = bonusItems.create( Phaser.Math.Between(1920, 1920*2), 120, 'item' )
+        bonus.setCollideWorldBounds(true)
+        bonus.setVelocity( 0, Phaser.Math.Between(50, 150))
+        
+        snails = this.physics.add.group({
+            classType: Snail,
+            maxSize: 20,
+            runChildUpdate: true,
+            allowGravity: true
+        });
+        this.physics.add.collider(snails, platforms);
+        this.physics.add.collider(snails, bolts, boltHit)
+        this.physics.add.collider(player, snails, hitSnail, null, this)
+        for (let i=0; i<4; i++) {
+            displaySnail(this)
+        }
+        UICam.ignore([snails, bonusItems, bolts ])
+
+        this.input.keyboard.enabled = true
+        spacebar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        keyT = this.input.keyboard.addKey('t');
+        keyA = this.input.keyboard.addKey('a');
+        doubleJump = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
+
+        const map = this.make.tilemap({ key: "map", tileWidth: 32, tileHeight: 32})
+        const tileset = map.addTilesetImage("sprite2dprogra", "tiles")
+        const background2 = map.createLayer("backround", tileset, 0, 0)
+        const platforms2 = map.createLayer("plateform", tileset, 0, 0)
+        background2.setCollisionByExclusion(-1, true);
+        platforms2.setCollisionByExclusion(-1, true);
+        platforms2.setCollisionByProperty({ collides: true });
+        this.physics.add.collider(player, platforms2);
+        this.physics.add.collider(snails, platforms2);
+        this.physics.add.collider(bonusItems, platforms2);
+    }
+
+    /**********************************************/
+    /* Manage player <-> bonus item effect */
+    function hitBonus( player, item ) {
+        item.setActive( false)
+        item.setVisible( false)
+        player.isinvulnerable = true 
+        invulnTime = 10000
+    }
+
+    /**********************************************/
+    /* Manage player <-> bonus item effect */
+    function hitSnail() {
+        if ( player.isinvulnerable == false ) {
+            player.PV -= 1
+            player.PV_timeout = Date.now()
+            player.isinvulnerable = true
+            invulnTime = 2100
+            console.log ('pv perdu', player.PV)
+            PVBarre.setTexture("PV"+player.PV+"Barre")
+            if (player.PV == 0) {
+                death(player)
+            }
+        }
+    }
+
+    /**********************************************/
+    /* Manage player death */
+    function death(player) {
+        this.physics.pause();
+        this.scene.restart();
+        player.setTint(0xff0000);
+        player.anims.play('right');
+        gameOver = true;
+    }
+
+function hitBomb(player, bomb){
+    this.physics.pause();
+        player.setTint(0xff0000);
+        player.anims.play('turn');
+        gameOver = true;
+    }
+function collectStar(player, star){
+    star.disableBody(true, true); // l’étoile disparaît
+    score += 10; //augmente le score de 10
+    if (stars.countActive(true) === 0){// si toutes les étoiles sont prises
+        stars.children.iterate(function (child) {
+        child.enableBody(true, child.x, 0, true, true);
+        }); // on les affiche toutes de nouveau
+        var x = (player.x < 400) ? Phaser.Math.Between(400, 800) :
+        Phaser.Math.Between(0, 400);
+        // si le perso est à gauche de l’écran, on met une bombe à droite
+        // si non, on la met à gauche de l’écra
+        displaySnail(this);
+        /*var bomb = bombs.create(x, 16, 'bomb');
+        bomb.setBounce(1);
+        bomb.setCollideWorldBounds(true);
+        bomb.setVelocity(Phaser.Math.Between(-200, 200), 20);
+        bomb.allowGravity = false; //elle n’est pas soumise à la gravité*/
+        }
+        
+}      
+    </script>
+    </body>
+    </html>
